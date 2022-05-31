@@ -28,7 +28,7 @@ class Node(object):
 
         # init agent
         self.agent = rl_agent.SACagent()
-        self.agent.load_weights()
+        self.agent.load_weights(self.env.get_config_args())
 
         # init cv bridge
         self.bridge = CvBridge()
@@ -45,15 +45,18 @@ class Node(object):
 
     def _point_callback(self, msg):
         # generate an episode
-        self.state = self.env.reset(initial_pos=[msg.x, msg.y])
-        episode_img, stroke_angles, club_indexes, club_names = self._generate_episode()
+        self.state = self.env.reset(initial_pos=[msg.x, msg.y], max_timestep=10)
+        successful, episode_img, stroke_angles, club_indexes, club_names = self._generate_episode()
         img_msg = self.bridge.cv2_to_imgmsg(episode_img, encoding='passthrough')
 
         # publish results
-        self._img_pub.publish(img_msg)
-        self._stroke_angles_pub.publish(std_msgs.msg.Float64MultiArray(data=stroke_angles))
-        self._club_indexes_pub.publish(std_msgs.msg.Int8MultiArray(data=club_indexes))
-        self._club_name_pub.publish(' '.join(club_names))
+        if successful:
+            self._img_pub.publish(img_msg)
+            self._stroke_angles_pub.publish(std_msgs.msg.Float64MultiArray(data=stroke_angles))
+            self._club_indexes_pub.publish(std_msgs.msg.Int8MultiArray(data=club_indexes))
+            self._club_name_pub.publish(' '.join(club_names))
+        else:
+            print('timestep exceeds max_timestep')
 
     def _generate_episode(self):
         # output arrays
@@ -92,4 +95,8 @@ class Node(object):
         # generate result img
         episode_img = self.env.paint()
 
-        return episode_img, stroke_angles, club_indexes, club_names
+        successful = True
+        if self.env.get_timestep() == 10:
+            successful = False
+
+        return successful, episode_img, stroke_angles, club_indexes, club_names
