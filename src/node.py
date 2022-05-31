@@ -2,9 +2,11 @@ import rospy
 import geometry_msgs.msg
 import sensor_msgs.msg
 import std_msgs.msg
+import rl_agent
 from golf_env.src import golf_env
-from golf_env.src import heuristic_agent
 from cv_bridge import CvBridge
+import numpy as np
+import tensorflow as tf
 
 
 class Node(object):
@@ -22,11 +24,16 @@ class Node(object):
 
         # init golf env
         self.env = golf_env.GolfEnv('straight')
-        self.agent = heuristic_agent.HeuristicAgent()
         self.state = self.env.reset()
+
+        # init agent
+        self.agent = rl_agent.SACagent()
+        self.agent.load_weights('../weights/')
 
         # init cv bridge
         self.bridge = CvBridge()
+
+        print('golf_strategy init done.')
 
         # run
         while not rospy.is_shutdown():
@@ -57,15 +64,28 @@ class Node(object):
         # generate an episode
         while True:
             # generate action
-            action = self.agent.step(self.state)
+            state_img, state_dist = self.state[0], self.state[1]
+            state_img = state_img.astype(np.float32) / 100.0
+            state_img = np.stack((state_img, state_img, state_img), axis=2)
+            state_dist = np.array(state_dist.reshape(1, ))
+            mu, _, ac_d = self.agent.actor(
+                tf.convert_to_tensor([state_img], dtype=tf.float32),
+                tf.convert_to_tensor([state_dist], dtype=tf.float32)
+            )
+            action_c = mu.numpy()[0]
+            action_d = np.argmax(ac_d)
 
             # store outputs
-            stroke_angles.append(action[0])
-            club_indexes.append(action[1])
-            club_names.append(golf_env.GolfEnv.CLUB_INFO[action[1]][golf_env.GolfEnv.ClubInfoIndex.NAME])
+            stroke_angles.append(action_c[action_d])
+            club_indexes.append(action_d)
+            club_names.append(golf_env.GolfEnv.CLUB_INFO[action_d][golf_env.GolfEnv.ClubInfoIndex.NAME])
 
             # step env
-            self.state, reward, termination = self.env.step(action)
+            self.state, reward, termination = self.env.step(
+                (action_c[action_d], action_d),
+                accurate_shots=True,
+                debug=True
+            )
             if termination:
                 break
 

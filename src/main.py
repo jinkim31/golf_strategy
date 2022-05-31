@@ -1,4 +1,4 @@
-#! /Users/jinkim/opt/miniconda3/envs/ros/bin/python
+#! /opt/homebrew/Caskroom/miniforge/base/envs/ros/bin/python
 import node
 
 if __name__ == '__main__':
