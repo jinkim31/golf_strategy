@@ -11,9 +11,7 @@ class FinalAgent:
         dist_to_pin = state[1]
         club_n = len(golf_env.GolfEnv.CLUB_INFO)
 
-        while True:
-            club = np.random.randint(club_n)
-            if golf_env.GolfEnv.CLUB_INFO[club][golf_env.GolfEnv.ClubInfoIndex.IS_DIST_PROPER](dist_to_pin):
-                break
+        club = min(golf_env.GolfEnv.CLUB_INFO, key=lambda c: (c[golf_env.GolfEnv.ClubInfoIndex.DIST] - dist_to_pin)**2)
+        club_index = golf_env.GolfEnv.CLUB_INFO.index(club)
 
-        return np.random.uniform(-45, 45), club
+        return np.random.uniform(-0, 0), club_index

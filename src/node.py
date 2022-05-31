@@ -4,6 +4,7 @@ import sensor_msgs.msg
 import std_msgs.msg
 import rl_agent
 from golf_env.src import golf_env
+import final_agent
 from cv_bridge import CvBridge
 import numpy as np
 import tensorflow as tf
@@ -29,6 +30,7 @@ class Node(object):
         # init agent
         self.agent = rl_agent.SACagent()
         self.agent.load_weights(self.env.get_config_args())
+        self.f_agent = final_agent.FinalAgent()
 
         # init cv bridge
         self.bridge = CvBridge()
@@ -56,7 +58,7 @@ class Node(object):
             self._club_indexes_pub.publish(std_msgs.msg.Int8MultiArray(data=club_indexes))
             self._club_name_pub.publish(' '.join(club_names))
         else:
-            print('timestep exceeds max_timestep')
+            print('timestep exceeded max_timestep.')
 
     def _generate_episode(self):
         # output arrays
@@ -67,21 +69,28 @@ class Node(object):
         # generate an episode
         while True:
             # generate action
-            state_img, state_dist = self.state[0], self.state[1]
-            state_img = state_img.astype(np.float32) / 100.0
-            state_img = np.stack((state_img, state_img, state_img), axis=2)
-            state_dist = np.array(state_dist.reshape(1, ))
-            mu, _, ac_d = self.agent.actor(
-                tf.convert_to_tensor([state_img], dtype=tf.float32),
-                tf.convert_to_tensor([state_dist], dtype=tf.float32)
-            )
-            action_c = mu.numpy()[0]
-            action_d = np.argmax(ac_d)
+            if self.state[1] < 50.0:
+                state_img, state_dist = self.state[0], self.state[1]
+                state_img = state_img.astype(np.float32) / 100.0
+                state_img = np.stack((state_img, state_img, state_img), axis=2)
+                state_dist = np.array(state_dist.reshape(1, ))
+                mu, _, ac_d = self.agent.actor(
+                    tf.convert_to_tensor([state_img], dtype=tf.float32),
+                    tf.convert_to_tensor([state_dist], dtype=tf.float32)
+                )
+                action_c = mu.numpy()[0]
+                action_d = np.argmax(ac_d)
+                club_index = action_d
+                stroke_angle = action_c[action_d]
+            else:
+                f_action = self.f_agent(self.state)
+                stroke_angle = f_action[0]
+                club_index = f_action[1]
 
             # store outputs
-            stroke_angles.append(action_c[action_d])
-            club_indexes.append(action_d)
-            club_names.append(golf_env.GolfEnv.CLUB_INFO[action_d][golf_env.GolfEnv.ClubInfoIndex.NAME])
+            stroke_angles.append(stroke_angle)
+            club_indexes.append(club_index)
+            club_names.append(golf_env.GolfEnv.CLUB_INFO[club_index][golf_env.GolfEnv.ClubInfoIndex.NAME])
 
             # step env
             self.state, reward, termination = self.env.step(
