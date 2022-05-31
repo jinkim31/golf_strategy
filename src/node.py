@@ -28,7 +28,7 @@ class Node(object):
 
         # init agent
         self.agent = rl_agent.SACagent()
-        self.agent.load_weights('../weights/')
+        self.agent.load_weights()
 
         # init cv bridge
         self.bridge = CvBridge()

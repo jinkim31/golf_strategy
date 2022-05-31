@@ -1,3 +1,5 @@
+import os.path
+
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -103,5 +105,5 @@ class SACagent(object):
         action_c, action_d, _, _, _ = self.actor.sample_normal(mu, std, ac_d)
         return action_c.numpy()[0], action_d.numpy()[0]
 
-    def load_weights(self, path):
-        self.actor.load_weights(path + 'actor_e_net_a.h5')
+    def load_weights(self):
+        self.actor.load_weights(os.path.join(os.path.dirname(__file__), '../weights/actor_e_net_a.h5'))
