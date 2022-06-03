@@ -1,4 +1,4 @@
-from src.golf_env.src import golf_env
+from golf_env.src import golf_env
 import numpy as np
 
 

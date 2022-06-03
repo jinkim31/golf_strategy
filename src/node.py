@@ -1,6 +1,7 @@
 import rospy
 import geometry_msgs.msg
 import sensor_msgs.msg
+import golf_strategy.msg
 import std_msgs.msg
 import rl_agent
 from golf_env.src import golf_env
@@ -8,7 +9,6 @@ import final_agent
 from cv_bridge import CvBridge
 import numpy as np
 import tensorflow as tf
-
 
 class Node(object):
 
@@ -21,6 +21,7 @@ class Node(object):
         self._club_indexes_pub = rospy.Publisher('golf_club_indexes', std_msgs.msg.Int8MultiArray, queue_size=1)
         self._club_name_pub = rospy.Publisher('golf_club_names', std_msgs.msg.String, queue_size=1)
         self._img_pub = rospy.Publisher('golf_img', sensor_msgs.msg.Image, queue_size=1)
+        self._advice_pub = rospy.Publisher('golf_advice', golf_strategy.msg.GolfAdvice, queue_size=1)
         self._point_sub = rospy.Subscriber('golf_point', geometry_msgs.msg.Point, self._point_callback)
 
         # init golf env
@@ -48,23 +49,19 @@ class Node(object):
     def _point_callback(self, msg):
         # generate an episode
         self.state = self.env.reset(initial_pos=[msg.x, msg.y], max_timestep=10)
-        successful, episode_img, stroke_angles, club_indexes, club_names = self._generate_episode()
+        successful, episode_img, advice_msg = self._generate_episode()
         img_msg = self.bridge.cv2_to_imgmsg(episode_img, encoding='passthrough')
 
         # publish results
         if successful:
             self._img_pub.publish(img_msg)
-            self._stroke_angles_pub.publish(std_msgs.msg.Float64MultiArray(data=stroke_angles))
-            self._club_indexes_pub.publish(std_msgs.msg.Int8MultiArray(data=club_indexes))
-            self._club_name_pub.publish(' '.join(club_names))
+            self._advice_pub.publish(advice_msg)
         else:
             print('timestep exceeded max_timestep.')
 
     def _generate_episode(self):
-        # output arrays
-        stroke_angles = []
-        club_names = []
-        club_indexes = []
+        # make msg
+        advice_msg = golf_strategy.msg.GolfAdvice()
 
         # generate an episode
         while True:
@@ -83,18 +80,18 @@ class Node(object):
                 club_index = action_d
                 stroke_angle = action_c[action_d]
             else:
-                f_action = self.f_agent(self.state)
+                f_action = self.f_agent.step(self.state)
                 stroke_angle = f_action[0]
                 club_index = f_action[1]
 
             # store outputs
-            stroke_angles.append(stroke_angle)
-            club_indexes.append(club_index)
-            club_names.append(golf_env.GolfEnv.CLUB_INFO[club_index][golf_env.GolfEnv.ClubInfoIndex.NAME])
+            advice_msg.stroke_angles.append(stroke_angle)
+            advice_msg.club_indexes.append(club_index)
+            advice_msg.club_names.append(golf_env.GolfEnv.CLUB_INFO[club_index][golf_env.GolfEnv.ClubInfoIndex.NAME])
 
             # step env
             self.state, reward, termination = self.env.step(
-                (action_c[action_d], action_d),
+                (stroke_angle, club_index),
                 accurate_shots=True,
                 debug=True
             )
@@ -108,4 +105,4 @@ class Node(object):
         if self.env.get_timestep() == 10:
             successful = False
 
-        return successful, episode_img, stroke_angles, club_indexes, club_names
+        return successful, episode_img, advice_msg
