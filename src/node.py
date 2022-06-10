@@ -26,6 +26,7 @@ class Node(object):
         self._img_pub = rospy.Publisher('golf_img', sensor_msgs.msg.Image, queue_size=1)
         self._advice_pub = rospy.Publisher('golf_advice', golf_strategy.msg.GolfAdvice, queue_size=1)
         self._point_sub = rospy.Subscriber('golf_point', geometry_msgs.msg.Point, self._point_callback, queue_size=1)
+        self._map_name_sub = rospy.Subscriber('golf_map_name', std_msgs.msg.String, self._map_name_callback, queue_size=1)
 
         # init golf variables
         self.env = None
@@ -56,6 +57,14 @@ class Node(object):
         self.agent = rl_agent.SACagent()
         self.agent.load_weights(self._SCENARIO[scenarios.ScenarioIndex.WEIGHT_NAME])
 
+    def _map_name_callback(self, msg):
+        self.env = golf_env.GolfEnv(msg.data)
+
+        advice_msg = golf_strategy.msg.GolfAdvice()
+        img_msg = self.bridge.cv2_to_imgmsg(self.env.paint(), encoding='passthrough')
+        self._img_pub.publish(img_msg)
+        self._advice_pub.publish(advice_msg)
+
     def _point_callback(self, msg):
         # generate an episode
         self.state = self.env.reset(initial_pos=[msg.x, msg.y], max_timestep=self._MAX_TIMESTEP)
@@ -63,8 +72,7 @@ class Node(object):
         img_msg = self.bridge.cv2_to_imgmsg(episode_img, encoding='passthrough')
 
         # publish results
-        # if successful:
-        if True:
+        if successful:
             self._img_pub.publish(img_msg)
             self._advice_pub.publish(advice_msg)
         else:
