@@ -106,4 +106,4 @@ class SACagent(object):
         return action_c.numpy()[0], action_d.numpy()[0]
 
     def load_weights(self, path):
-        self.actor.load_weights(os.path.join(os.path.dirname(__file__), '..', path))
+        self.actor.load_weights(os.path.join(os.path.dirname(__file__), '../weights', path))

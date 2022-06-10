@@ -9,9 +9,14 @@ import final_agent
 from cv_bridge import CvBridge
 import numpy as np
 import tensorflow as tf
+import scenarios
+import skill_models
 
 
 class Node(object):
+
+    _MAX_TIMESTEP = 10
+    _SCENARIO = scenarios.scenarios['hwangak-amateur']
 
     def __init__(self):
         # init ros
@@ -20,16 +25,13 @@ class Node(object):
         # inti ros communications
         self._img_pub = rospy.Publisher('golf_img', sensor_msgs.msg.Image, queue_size=1)
         self._advice_pub = rospy.Publisher('golf_advice', golf_strategy.msg.GolfAdvice, queue_size=1)
-        self._point_sub = rospy.Subscriber('golf_point', geometry_msgs.msg.Point, self._point_callback)
+        self._point_sub = rospy.Subscriber('golf_point', geometry_msgs.msg.Point, self._point_callback, queue_size=1)
 
-        # init golf env
-        self.env = golf_env.GolfEnv('straight')
-        self.state = self.env.reset()
-
-        # init agent
-        self.agent = rl_agent.SACagent()
-        self.agent.load_weights(self.env.get_config_args())
+        # init golf variables
+        self.env = None
+        self.agent = None
         self.f_agent = final_agent.FinalAgent()
+        self._setup_scenario()
 
         # init cv bridge
         self.bridge = CvBridge()
@@ -44,14 +46,25 @@ class Node(object):
     def __spin_once(self):
         pass
 
+    def _setup_scenario(self):
+        # init golf env
+        self.env = golf_env.GolfEnv(self._SCENARIO[scenarios.ScenarioIndex.MAP_NAME])
+        self.env.set_skill_model(skill_models.skill_models[self._SCENARIO[scenarios.ScenarioIndex.SKILL_MODEL_NAME]])
+        self.state = self.env.reset()
+
+        # init agent
+        self.agent = rl_agent.SACagent()
+        self.agent.load_weights(self._SCENARIO[scenarios.ScenarioIndex.WEIGHT_NAME])
+
     def _point_callback(self, msg):
         # generate an episode
-        self.state = self.env.reset(initial_pos=[msg.x, msg.y], max_timestep=10)
+        self.state = self.env.reset(initial_pos=[msg.x, msg.y], max_timestep=self._MAX_TIMESTEP)
         successful, episode_img, advice_msg = self._generate_episode()
         img_msg = self.bridge.cv2_to_imgmsg(episode_img, encoding='passthrough')
 
         # publish results
-        if successful:
+        # if successful:
+        if True:
             self._img_pub.publish(img_msg)
             self._advice_pub.publish(advice_msg)
         else:
@@ -64,7 +77,7 @@ class Node(object):
         # generate an episode
         while True:
             # generate action
-            if self.state[1] < 50.0:
+            if True:
                 state_img, state_dist = self.state[0], self.state[1]
                 state_img = state_img.astype(np.float32) / 100.0
                 state_img = np.stack((state_img, state_img, state_img), axis=2)
@@ -85,7 +98,7 @@ class Node(object):
             # store outputs
             advice_msg.stroke_angles.append(stroke_angle)
             advice_msg.club_indexes.append(club_index)
-            advice_msg.club_names.append(golf_env.GolfEnv.CLUB_INFO[club_index][golf_env.GolfEnv.ClubInfoIndex.NAME])
+            advice_msg.club_names.append(golf_env.GolfEnv.SKILL_MODEL[club_index][golf_env.GolfEnv.ClubInfoIndex.NAME])
 
             # step env
             self.state, reward, termination = self.env.step(
@@ -100,7 +113,7 @@ class Node(object):
         episode_img = self.env.paint()
 
         successful = True
-        if self.env.get_timestep() == 10:
+        if self.env.get_timestep() == self._MAX_TIMESTEP:
             successful = False
 
         return successful, episode_img, advice_msg
