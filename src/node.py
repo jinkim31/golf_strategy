@@ -69,6 +69,7 @@ class Node(object):
         self._advice_pub.publish(advice_msg)
 
     def _point_callback(self, msg):
+        print('point(' + str(msg.x)+','+str(msg.y)+')')
         # generate an episode
         self.state = self.env.reset(initial_pos=[msg.x, msg.y], max_timestep=self._MAX_TIMESTEP)
         successful, episode_img, advice_msg = self._generate_episode()
@@ -129,7 +130,7 @@ class Node(object):
             # step env
             self.state, reward, termination = self.env.step(
                 (stroke_angle, club_index),
-                accurate_shots=False,
+                accurate_shots=True,
                 debug=True
             )
             if termination:

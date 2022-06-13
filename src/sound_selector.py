@@ -25,13 +25,15 @@ club_to_sound = {
 
 
 def angle_to_sound(angle):
-    angles = np.linspace(-90, 90, 36 + 1)
+    angles = np.linspace(-35, 35, 70 + 1)
 
     result = min(angles, key=lambda a: (angle - a)**2)
 
-    if result >= 0:
-        result = '+' + str(int(np.abs(result)))
-    else:
+    if result < 0:
         result = '-' + str(int(np.abs(result)))
+    else:
+        result = str(int(np.abs(result)))
 
-    return result + '.mp3'
+    result = result + '.mp3'
+    print(result)
+    return result
