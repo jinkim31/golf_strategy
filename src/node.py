@@ -1,3 +1,5 @@
+import os
+
 import rospy
 import geometry_msgs.msg
 import sensor_msgs.msg
@@ -11,7 +13,8 @@ import numpy as np
 import tensorflow as tf
 import scenarios
 import skill_models
-
+import playsound
+import sound_selector
 
 class Node(object):
 
@@ -75,6 +78,21 @@ class Node(object):
         if successful:
             self._img_pub.publish(img_msg)
             self._advice_pub.publish(advice_msg)
+
+            club_sound_path = os.path.join(
+                os.path.dirname(__file__),
+                '../sounds',
+                sound_selector.club_to_sound[advice_msg.club_names[0]]
+            )
+            playsound.playsound(club_sound_path)
+
+            angle_sound_path = os.path.join(
+                os.path.dirname(__file__),
+                '../sounds',
+                sound_selector.angle_to_sound(advice_msg.stroke_angles[0])
+            )
+            playsound.playsound(angle_sound_path)
+
         else:
             print('timestep exceeded max_timestep.')
 
@@ -111,7 +129,7 @@ class Node(object):
             # step env
             self.state, reward, termination = self.env.step(
                 (stroke_angle, club_index),
-                accurate_shots=True,
+                accurate_shots=False,
                 debug=True
             )
             if termination:
