@@ -128,7 +128,7 @@ class Node(object):
         # generate an episode
         while True:
             # generate action
-            if self.state[1] < self._F_AGENT_THRESHOLD:
+            if self.state[1] > self._F_AGENT_THRESHOLD:
                 state_img, state_dist = self.state[0], self.state[1]
                 state_img = state_img.astype(np.float32) / 100.0
                 state_img = np.stack((state_img, state_img, state_img), axis=2)
