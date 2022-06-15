@@ -174,7 +174,7 @@ class Node(object):
                 break
 
         # store green_strokes
-        advice_msg.green_strokes = reward  # last reward before termination = estimated strokes left
+        advice_msg.green_strokes = -reward - 1  # last reward before termination = estimated strokes left
 
         # generate result img
         episode_img = self.env.paint()
