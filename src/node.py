@@ -1,5 +1,4 @@
 import os
-
 import rospy
 import geometry_msgs.msg
 import sensor_msgs.msg
@@ -41,7 +40,8 @@ class Node(object):
         self.env = None
         self.agent = None
         self.f_agent = final_agent.FinalAgent()
-        self._setup_scenario('hwangak-amateur')
+        self.scenario_name = 'hwangak-amateur'
+        self._setup_scenario(self.scenario_name)
 
         # inti ros communications
         self._img_pub = rospy.Publisher('golf_img', sensor_msgs.msg.Image, queue_size=1)
@@ -66,6 +66,7 @@ class Node(object):
         # get scenario
         if scenario_name in scenarios.scenarios:
             scenario = scenarios.scenarios[scenario_name]
+            self.scenario_name = scenario_name
         else:
             raise self.NoSuchScenarioException(scenario_name)
             return
@@ -147,6 +148,8 @@ class Node(object):
                 club_index = f_action[1]
 
             # store outputs
+            advice_msg.nap_name = scenarios.scenarios[self.scenario_name][scenarios.ScenarioIndex.MAP_NAME]
+            advice_msg.skill_name = scenarios.scenarios[self.scenario_name][scenarios.ScenarioIndex.SKILL_MODEL_NAME]
             advice_msg.stroke_angles.append(stroke_angle)
             advice_msg.club_indexes.append(club_index)
             advice_msg.club_names.append(golf_env.GolfEnv.SKILL_MODEL[club_index][golf_env.GolfEnv.ClubInfoIndex.NAME])
