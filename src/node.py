@@ -17,7 +17,7 @@ import sound_selector
 
 
 class Node(object):
-
+    # exceptions
     class NoSuchScenarioException(Exception):
         def __init__(self, name):
             self.name = name
@@ -28,9 +28,10 @@ class Node(object):
                    + 'Scenario name can be one of following: ' \
                    + str(list(scenarios.scenarios.keys()))
 
+    # consts
     _MAX_TIMESTEP = 10
     _F_AGENT_THRESHOLD = 0.0
-    _PLAY_SOUNDS = True
+    _PLAY_SOUNDS = False
 
     def __init__(self):
         # init ros
@@ -48,7 +49,8 @@ class Node(object):
         self._advice_pub = rospy.Publisher('golf_advice', golf_strategy.msg.GolfAdvice, queue_size=1)
         self._advice_text_pub = rospy.Publisher('golf_advice_text', golf_strategy.msg.GolfAdvice, queue_size=1)
         self._point_sub = rospy.Subscriber('golf_point', geometry_msgs.msg.Point, self._point_callback, queue_size=1)
-        self._map_name_sub = rospy.Subscriber('golf_scenario_name', std_msgs.msg.String, self._scenario_name_callback,queue_size=1)
+        self._map_name_sub = rospy.Subscriber('golf_scenario_name', std_msgs.msg.String, self._scenario_name_callback,
+                                              queue_size=1)
 
         # init cv bridge
         self.bridge = CvBridge()
@@ -74,7 +76,7 @@ class Node(object):
         # init golf env
         self.env = golf_env.GolfEnv(scenario[scenarios.ScenarioIndex.MAP_NAME])
         self.env.set_skill_model(skill_models.skill_models[scenario[scenarios.ScenarioIndex.SKILL_MODEL_NAME]])
-        self.state = self.env.reset()
+        self.state = self.env.reset(max_timestep=self._MAX_TIMESTEP)
 
         # init agent
         self.agent = rl_agent.SACagent()
@@ -125,6 +127,8 @@ class Node(object):
     def _generate_episode(self):
         # make msg
         advice_msg = golf_strategy.msg.GolfAdvice()
+        advice_msg.advice_text = ''
+        advice_msg.advice_text_brief = ''
 
         # generate an episode
         while True:
@@ -160,12 +164,22 @@ class Node(object):
                 accurate_shots=True,
                 debug=True
             )
+
+            # store advice texts
+            debug_str = self.env.get_state_metadata()['debug_str']
+            advice_msg.advice_text += debug_str + '\n'
+            advice_msg.advice_text_brief += debug_str[7:14] + debug_str[17:27] + debug_str[28:38] + '\n'
+
             if termination:
                 break
+
+        # store green_strokes
+        advice_msg.green_strokes = reward  # last reward before termination = estimated strokes left
 
         # generate result img
         episode_img = self.env.paint()
 
+        # check timestep
         successful = True
         if self.env.get_timestep() == self._MAX_TIMESTEP:
             successful = False
