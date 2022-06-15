@@ -16,33 +16,45 @@ import skill_models
 import playsound
 import sound_selector
 
+
 class Node(object):
 
+    class NoSuchScenarioException(Exception):
+        def __init__(self, name):
+            self.name = name
+
+        def __str__(self):
+            return 'No such scenario name ' \
+                   + str(self.name) + '. ' \
+                   + 'Scenario name can be one of following: ' \
+                   + str(list(scenarios.scenarios.keys()))
+
     _MAX_TIMESTEP = 10
-    _SCENARIO = scenarios.scenarios['hwangak-amateur']
+    _F_AGENT_THRESHOLD = 0.0
+    _PLAY_SOUNDS = True
 
     def __init__(self):
         # init ros
         rospy.init_node('golf_strategy')
 
-        # inti ros communications
-        self._img_pub = rospy.Publisher('golf_img', sensor_msgs.msg.Image, queue_size=1)
-        self._advice_pub = rospy.Publisher('golf_advice', golf_strategy.msg.GolfAdvice, queue_size=1)
-        self._point_sub = rospy.Subscriber('golf_point', geometry_msgs.msg.Point, self._point_callback, queue_size=1)
-        self._map_name_sub = rospy.Subscriber('golf_map_name', std_msgs.msg.String, self._map_name_callback, queue_size=1)
-
         # init golf variables
         self.env = None
         self.agent = None
         self.f_agent = final_agent.FinalAgent()
-        self._setup_scenario()
+        self._setup_scenario('hwangak-amateur')
+
+        # inti ros communications
+        self._img_pub = rospy.Publisher('golf_img', sensor_msgs.msg.Image, queue_size=1)
+        self._advice_pub = rospy.Publisher('golf_advice', golf_strategy.msg.GolfAdvice, queue_size=1)
+        self._advice_text_pub = rospy.Publisher('golf_advice_text', golf_strategy.msg.GolfAdvice, queue_size=1)
+        self._point_sub = rospy.Subscriber('golf_point', geometry_msgs.msg.Point, self._point_callback, queue_size=1)
+        self._map_name_sub = rospy.Subscriber('golf_scenario_name', std_msgs.msg.String, self._scenario_name_callback,queue_size=1)
 
         # init cv bridge
         self.bridge = CvBridge()
 
-        print('golf_strategy init done.')
-
         # run
+        print('golf_strategy init done.')
         while not rospy.is_shutdown():
             self.__spin_once()
             rospy.sleep(0.1)
@@ -50,26 +62,37 @@ class Node(object):
     def __spin_once(self):
         pass
 
-    def _setup_scenario(self):
+    def _setup_scenario(self, scenario_name):
+        # get scenario
+        if scenario_name in scenarios.scenarios:
+            scenario = scenarios.scenarios[scenario_name]
+        else:
+            raise self.NoSuchScenarioException(scenario_name)
+            return
+
         # init golf env
-        self.env = golf_env.GolfEnv(self._SCENARIO[scenarios.ScenarioIndex.MAP_NAME])
-        self.env.set_skill_model(skill_models.skill_models[self._SCENARIO[scenarios.ScenarioIndex.SKILL_MODEL_NAME]])
+        self.env = golf_env.GolfEnv(scenario[scenarios.ScenarioIndex.MAP_NAME])
+        self.env.set_skill_model(skill_models.skill_models[scenario[scenarios.ScenarioIndex.SKILL_MODEL_NAME]])
         self.state = self.env.reset()
 
         # init agent
         self.agent = rl_agent.SACagent()
-        self.agent.load_weights(self._SCENARIO[scenarios.ScenarioIndex.WEIGHT_NAME])
+        self.agent.load_weights(scenario[scenarios.ScenarioIndex.WEIGHT_NAME])
 
-    def _map_name_callback(self, msg):
-        self.env = golf_env.GolfEnv(msg.data)
+        print('scenario set to ' + scenario_name)
 
+    def _scenario_name_callback(self, msg):
+        # setup scenario
+        self._setup_scenario(msg.data)
+
+        # publish result
         advice_msg = golf_strategy.msg.GolfAdvice()
         img_msg = self.bridge.cv2_to_imgmsg(self.env.paint(), encoding='passthrough')
         self._img_pub.publish(img_msg)
         self._advice_pub.publish(advice_msg)
 
     def _point_callback(self, msg):
-        print('point(' + str(msg.x)+','+str(msg.y)+')')
+        print('point(' + str(msg.x) + ',' + str(msg.y) + ')')
         # generate an episode
         self.state = self.env.reset(initial_pos=[msg.x, msg.y], max_timestep=self._MAX_TIMESTEP)
         successful, episode_img, advice_msg = self._generate_episode()
@@ -80,19 +103,20 @@ class Node(object):
             self._img_pub.publish(img_msg)
             self._advice_pub.publish(advice_msg)
 
-            club_sound_path = os.path.join(
-                os.path.dirname(__file__),
-                '../sounds',
-                sound_selector.club_to_sound[advice_msg.club_names[0]]
-            )
-            playsound.playsound(club_sound_path)
+            if self._PLAY_SOUNDS:
+                club_sound_path = os.path.join(
+                    os.path.dirname(__file__),
+                    '../sounds',
+                    sound_selector.club_to_sound[advice_msg.club_names[0]]
+                )
+                playsound.playsound(club_sound_path)
 
-            angle_sound_path = os.path.join(
-                os.path.dirname(__file__),
-                '../sounds',
-                sound_selector.angle_to_sound(advice_msg.stroke_angles[0])
-            )
-            playsound.playsound(angle_sound_path)
+                angle_sound_path = os.path.join(
+                    os.path.dirname(__file__),
+                    '../sounds',
+                    sound_selector.angle_to_sound(advice_msg.stroke_angles[0])
+                )
+                playsound.playsound(angle_sound_path)
 
         else:
             print('timestep exceeded max_timestep.')
@@ -104,7 +128,7 @@ class Node(object):
         # generate an episode
         while True:
             # generate action
-            if True:
+            if self.state[1] < self._F_AGENT_THRESHOLD:
                 state_img, state_dist = self.state[0], self.state[1]
                 state_img = state_img.astype(np.float32) / 100.0
                 state_img = np.stack((state_img, state_img, state_img), axis=2)

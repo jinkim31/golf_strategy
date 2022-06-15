@@ -11,9 +11,13 @@ class ScenarioIndex(IntEnum):
 # @formatter:off
 
 scenarios = {
-    'hwangak-beginner': ('hwangak', 'beginner', 'hwangak_beginner.h5'),
-    'hwangak-amateur': ('hwangak', 'amateur', 'hwangak_amateur.h5'),
-    'sejong-amateur': ('sejong', 'amateur', 'sejong_amateur.h5'),
+    #                      MAP_NAME     SKILL_MODEL     WEIGHT
+    'hwangak-beginner'  : ('hwangak',   'beginner',     'hwangak_beginner.h5'),
+    'hwangak-amateur'   : ('hwangak',   'amateur',      'hwangak_amateur.h5'),
+    'sejong-beginner'   : ('sejong',    'beginner',     'sejong_beginner.h5'),
+    'sejong-amateur'    : ('sejong',    'amateur',      'sejong_amateur.h5'),
+    'yeogang-beginner'  : ('yeogang',   'beginner',     'yeogang_beginner.h5'),
+    'yeogang-amateur'   : ('yeogang',   'amateur',      'yeogang_amateur.h5'),
 }
 
 # @formatter:on
