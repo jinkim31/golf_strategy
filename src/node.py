@@ -41,8 +41,7 @@ class Node(object):
         self.env = None
         self.agent = None
         self.f_agent = final_agent.FinalAgent()
-        self.scenario_name = 'hwangak-amateur'
-        self._setup_scenario(self.scenario_name)
+        self.scenario_name = ''
 
         # inti ros communications
         self._img_pub = rospy.Publisher('golf_img', sensor_msgs.msg.Image, queue_size=1)
@@ -95,7 +94,11 @@ class Node(object):
         self._advice_pub.publish(advice_msg)
 
     def _point_callback(self, msg):
-        print('point(' + str(msg.x) + ',' + str(msg.y) + ')')
+        # check scenario setup
+        if self.scenario_name == '':
+            print('Scenario not set up yet. Publish std_msgs/String /golf_scenario_name to setup scenario.')
+            return
+
         # generate an episode
         self.state = self.env.reset(initial_pos=[msg.x, msg.y], max_timestep=self._MAX_TIMESTEP)
         successful, episode_img, advice_msg = self._generate_episode()
@@ -174,7 +177,7 @@ class Node(object):
                 break
 
         # store green_strokes
-        advice_msg.green_strokes = -reward - 1  # last reward before termination = estimated strokes left
+        advice_msg.green_strokes = -reward - 1
 
         # generate result img
         episode_img = self.env.paint()
