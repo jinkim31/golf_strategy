@@ -176,6 +176,7 @@ class Node(object):
             if termination:
                 break
 
+        self.env.plot()
         # store green_strokes
         advice_msg.green_strokes = -reward - 1
 
