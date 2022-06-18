@@ -31,7 +31,7 @@ class Node(object):
     # consts
     _MAX_TIMESTEP = 10
     _F_AGENT_THRESHOLD = 0.0
-    _PLAY_SOUNDS = True
+    _PLAY_SOUNDS = False
 
     def __init__(self):
         # init ros
